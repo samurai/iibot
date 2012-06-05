@@ -8,6 +8,8 @@ from random import randint
 
 ##BOT FUNCTIONS##
 def sendMessage(resource, message):
+	if resource is logger:
+		message = str(time.time()) + ":" + message
 	if message[-1] != "\n":
 		message = message + "\n"
 	resource.write(message)
@@ -30,7 +32,7 @@ def addUser(nick, users):
 	if nick in users.keys():
 		return users
 	else:
-		users[nick] = {'message_times':[], 'joined':time.time(), 'voice':0}
+		users[nick] = {'message_times':[], 'joined':time.time(), 'voice':0} ##TODO: this init should probably be done better
 		if nick != state['mynick']:
 			sendMessage(output, "Welcome to the room, %s" % (nick))
 			##need to do this to initialize the PM FIFO's, there's a patch to auto-do this, but I'm not using it currently
@@ -40,8 +42,9 @@ def addUser(nick, users):
 		return users
 
 def delUser(nick, users):
-	del(users[nick])
-	sendMessage(logger, "%s has left the room" % (nick))
+	if nick in users.keys():
+		del(users[nick])
+		sendMessage(logger, "%s has left the room" % (nick))
 	return users
 
 
@@ -82,6 +85,8 @@ state = {}
 state['mynick'] = 'iibot' ##bot's nickname
 state['mychannel'] = '#testingit' ##channel this bot is in (currently only supports 1 channel + PMs)
 state['flood_max'] = 15.0 #sending more than 10 messages in 15 seconds? that's a kick for you! 
+state['last_event'] = time.time()
+state['last_message'] = 0
 
 #users object
 users = addUser(state['mynick'],{}) ## init this and add the bot
@@ -95,9 +100,9 @@ COMMANDS['help'] = help   ##e.g. COMMANDS['cmd'] = help, would make !cmd return 
 ##RUNTIME##
 lines = ['']
 while 1:
+	while '' in lines and len(lines) > 1:  ##incase we ate up any null lines, we dont need to process those
+		lines.remove('')
 	line = lines.pop()  ##get the message we want to respond to, this is processed below
-	if '' in lines: ##clear any null messages
-		lines.remove('') 
 	lines.append(input.readline().replace("\n","")) ##get a new message and push it onto our input list
 	if line != "": ##if the line actually has data (pythonw will return "" when readline fails)
 		message_time = line[:17] ##get the time ii reports
@@ -114,18 +119,41 @@ while 1:
 				users[nick]['message_times'].append(time.time())  
 		##users entering or leaving
 		if nick == "-!-":
-			tmp = message.split("(")
 			nick = tmp[0]
 			if "has joined" in message:
+				tmp = message.split("(")
+				nick = tmp[0]
 				users = addUser(nick, users)
 			if "has left" in message and nick in users.keys():
+				tmp = message.split("(")
+				nick = tmp[0]
 				users = delUser(nick, users)
-		##any other message
-		else: ##we pretty much addUser() regardless, as the function itself does checks for already existing users
+			if "ChanServ kicked" in message:
+				tmp = message.split("kicked ")
+				tmp2 = tmp[1].split(" ")
+				nick = tmp2[0]
+				users = delUser(nick, users)
+		#got a message from someone
+		elif nick[0] == "<" and nick[-1] == ">":
+			nick = nick[1:-1]
 			users = addUser(nick, users)
-	
+			if nick != state['mynick']:
+				state['last_message'] = time.time()
+		#entered a room, let's grab the user's list
+		elif "=" == nick and state['mynick']  in message:
+			tmp = message.split(" ")[1:-1]
+			for i in xrange(len(tmp)):
+				if tmp[i][0] in ("@","%","+"):
+					tmp[i] = tmp[i][1:]
+				if tmp[i] != state['mynick']:
+					users = addUser(tmp[i],users)
+		##anythign else
+		else:
+			sendMessage(logger, "Something invalid or unexpected came into my pipe for 'nick':")
+			sendMessage(logger, "[NICK]" + nick + "| [MSG]" + message + "|")
+
 		##we've got a command
-		if message[0] == COMMAND_CHAR and nick != state['mynick']: ##command processing
+		if len(message) > 0 and message[0] == COMMAND_CHAR and nick != state['mynick']: ##command processing
 			tmp = message[1:].split(" ") ##parsing out the command/args
 			command = tmp[0].lower()
 			args = " ".join(tmp[1:])
