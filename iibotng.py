@@ -29,11 +29,16 @@ class iibot:
 		self.halt = 1
 		self.__del__()
 
-	def connect(self, host):
+	## Note, ssl will require the patch at http://tools.suckless.org/ii/patches/ii-1.7-ssl.diff
+	def connect(self, host, ssl=0):
 		if host in self.servers:
 			print "Already connected to %s" % (host)
 			return -1
-		self.proc = subprocess.Popen([self.iipath, "-s", host, "-n", self.nick, "-i", self.iidir, "&"])
+		cmd = [self.iipath, "-s", host, "-n", self.nick, "-i", self.iidir]
+		if ssl:
+			cmd += ["-e","ssl"]
+		cmd.append("&")
+		self.proc = subprocess.Popen(cmd)
 		time.sleep(5)
 		self.servers[host] = []
 		self.halt = 0
