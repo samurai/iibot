@@ -82,8 +82,8 @@ logger = open("./logs","a") ## log, you can also point this at one of ii's FIFO'
 
 #state - so the bot knows what's up
 state = {}
-state['mynick'] = 'iibot' ##bot's nickname
-state['mychannel'] = '#testingit' ##channel this bot is in (currently only supports 1 channel + PMs)
+state['mynick'] = 'AyEye' ##bot's nickname
+state['mychannel'] = '#rawptest' ##channel this bot is in (currently only supports 1 channel + PMs)
 state['flood_max'] = 15.0 #sending more than 10 messages in 15 seconds? that's a kick for you! 
 state['last_event'] = time.time()
 state['last_message'] = 0
